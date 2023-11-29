@@ -1,3 +1,5 @@
+import sys
+import time
 import socket
 
 # total packet size
@@ -7,7 +9,7 @@ SEQ_ID_SIZE = 4
 # bytes available for message
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 # total packets to send
-WINDOW_SIZE = 5
+WINDOW_SIZE = 20
 ACKS = {}
 
 # read data
@@ -20,7 +22,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     # bind the socket to a OS port
     udp_socket.bind(("localhost", 5000))
     udp_socket.settimeout(1)
-    
+
+    start_time = time.time()
+    packet_start_times = {}
+    packet_end_times = {}
     # start sending data from 0th sequence
     seq_id = 0
     while seq_id < len(data):
@@ -45,6 +50,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
 
         # send messages
         for sid, message in messages:
+            for k in acks.keys():
+                packet_start_times[k] = time.time()
             print('sending', sid)
             udp_socket.sendto(message, ('localhost', 5001))
         
@@ -61,6 +68,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 for _id in acks:
                     if _id < ack_id:
                         acks[_id] = True
+                        if _id not in packet_end_times:
+                            packet_end_times[_id] = time.time()
                         
                 ACKS[ack_id] = ACKS.get(ack_id, 0) + 1
                 
@@ -70,7 +79,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             except socket.timeout:
                 # no ack received, resend unacked messages
                 for sid, message in messages:
-                    if not acks[sid]:
+                    #if not acks[sid]:
+                    if not acks.get(sid, False):
                         print('sending', sid)
                         udp_socket.sendto(message, ('localhost', 5001))
                 
@@ -79,7 +89,24 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
         
     # send final closing message
     print('here')
+    end_time = time.time()
+    time_elapsed = end_time - start_time
+
+    avg_delay = 0
+    for k in packet_end_times.keys():
+        packet_delay = packet_end_times[k] - packet_start_times[k]
+        avg_delay += packet_delay
+
+    avg_delay /= len(packet_end_times.keys())
+    metric = sys.getsizeof(data)/(avg_delay * time_elapsed)
+    print("throughput ")
+    print(sys.getsizeof(data) / time_elapsed)
+    print("avg delay")
+    print(avg_delay)
+    print("metric")
+    print(metric)
+    
     udp_socket.sendto(int.to_bytes(seq_id, 4, signed=True, byteorder='big'), ('localhost', 5001))
     
     
-print(ACKS)
+#print(ACKS)
