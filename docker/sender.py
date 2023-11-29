@@ -14,7 +14,7 @@ ACKS = {}
 
 # read data
 with open('file.mp3', 'rb') as f:
-    data = f.read()
+    data = f.read()[:500000]
  
 # create a udp socket
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
@@ -38,32 +38,41 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             # construct messages
             # sequence id of length SEQ_ID_SIZE + message of remaining PACKET_SIZE - SEQ_ID_SIZE bytes
             message_data = data[seq_id_tmp : seq_id_tmp + MESSAGE_SIZE]
-            message = int.to_bytes(seq_id_tmp, SEQ_ID_SIZE, byteorder='big', signed=True) + message_data
-            messages.append((seq_id_tmp, message))
             # check if not last message
             if len(message_data) == 0:
-                break
+                message = int.to_bytes(seq_id_tmp, SEQ_ID_SIZE, byteorder='big', signed=True)
+            else:
+                message = int.to_bytes(seq_id_tmp, SEQ_ID_SIZE, byteorder='big', signed=True) + message_data
+            messages.append((seq_id_tmp, message))
             # create ack
             acks[seq_id_tmp] = False
             # move seq_id tmp pointer ahead
             seq_id_tmp += len(message_data)
+            if len(message_data) == 0:
+                break
+
 
         # send messages
         for sid, message in messages:
             for k in acks.keys():
                 packet_start_times[k] = time.time()
-            print('sending', sid)
+            # print('sending', sid)
             udp_socket.sendto(message, ('localhost', 5001))
         
         # wait for acknowledgement
         while True:
             try:
+                # print(acks)
                 # wait for ack
-                ack, _ = udp_socket.recvfrom(PACKET_SIZE)
+                ack, _ = udp_socket.recvfrom(PACKET_SIZE)    
                 
                 # extract ack id
                 ack_id = int.from_bytes(ack[:SEQ_ID_SIZE], byteorder='big')
+                ack_message = ack[SEQ_ID_SIZE:]
                 
+                if ack_message == 'fin':
+                    break
+                                
                 # update acks below cumulative ack
                 for _id in acks:
                     if _id < ack_id:
@@ -73,6 +82,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                         
                 ACKS[ack_id] = ACKS.get(ack_id, 0) + 1
                 
+                print('received', ack_id)
+                
                 # all acks received, move on
                 if all(acks.values()):
                     break
@@ -81,13 +92,21 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 for sid, message in messages:
                     #if not acks[sid]:
                     if not acks.get(sid, False):
-                        print('sending', sid)
+                        # print('sending', sid)
                         udp_socket.sendto(message, ('localhost', 5001))
                 
         # move sequence id forward
         seq_id = seq_id_tmp
         
     # send final closing message
+    
+    finack = int.to_bytes(seq_id, SEQ_ID_SIZE, byteorder='big', signed=True) + b'==FINACK=='
+    try:
+        udp_socket.sendto(finack, ('localhost', 5001))            
+        ack, _ = udp_socket.recvfrom(PACKET_SIZE)
+    except: pass
+        
+        
     print('here')
     end_time = time.time()
     time_elapsed = end_time - start_time
