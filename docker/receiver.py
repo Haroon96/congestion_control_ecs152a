@@ -58,6 +58,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
         except socket.timeout:
             timeouts += 1
 
-with open('/hdd/recv.txt', 'wb') as f:
+with open('/hdd/file2.mp3', 'wb') as f:
     for sid in sorted(RECEIVED_DATA.keys()):
         f.write(RECEIVED_DATA[sid])

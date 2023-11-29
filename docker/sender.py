@@ -11,7 +11,7 @@ WINDOW_SIZE = 5
 ACKS = {}
 
 # read data
-with open('send.txt', 'rb') as f:
+with open('file.mp3', 'rb') as f:
     data = f.read()
  
 # create a udp socket
