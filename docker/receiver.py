@@ -24,9 +24,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             # receive the packet
             packet, client = udp_socket.recvfrom(PACKET_SIZE)
             
-            if random.random() < 0.1:
-                continue
-
             # get the message id
             seq_id, message = packet[:SEQ_ID_SIZE], packet[SEQ_ID_SIZE:]
             
@@ -61,6 +58,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
         except socket.timeout:
             timeouts += 1
 
-with open('recv.txt', 'wb') as f:
+with open('/hdd/recv.txt', 'wb') as f:
     for sid in sorted(RECEIVED_DATA.keys()):
         f.write(RECEIVED_DATA[sid])
